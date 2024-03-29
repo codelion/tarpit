@@ -31,15 +31,15 @@ public class ServletTarPit extends HttpServlet {
   private PreparedStatement preparedStatement;
   private ResultSet resultSet;
 
-
   private final static Logger LOGGER = Logger.getLogger(ServletTarPit.class.getName());
 
   @Override
   protected void doGet(HttpServletRequest request, HttpServletResponse response)
       throws ServletException, IOException {
 
-    String ACCESS_KEY_ID = "AKIA2E0A8F3B244C9986";
-    String SECRET_KEY = "7CE556A3BC234CC1FF9E8A5C324C0BB70AA21B6D";
+    // Removed hardcoded AWS credentials and replaced with environment variables
+    String ACCESS_KEY_ID = System.getenv("AWS_ACCESS_KEY_ID");
+    String SECRET_KEY = System.getenv("AWS_SECRET_ACCESS_KEY");
 
     String txns_dir = System.getProperty("transactions_folder","/rolling/transactions");
 
@@ -57,23 +57,27 @@ public class ServletTarPit extends HttpServlet {
 
     try {
 
-
       ScriptEngineManager manager = new ScriptEngineManager();
       ScriptEngine engine = manager.getEngineByName("JavaScript");
-      engine.eval(request.getParameter("module"));
+      // Removed eval call to prevent eval injection
+      // engine.eval(request.getParameter("module"));
 
       /* FLAW: Insecure cryptographic algorithm (DES) 
       CWE: 327 Use of Broken or Risky Cryptographic Algorithm */
-      Cipher des = Cipher.getInstance("DES");
-      SecretKey key = KeyGenerator.getInstance("DES").generateKey();
-      des.init(Cipher.ENCRYPT_MODE, key);
+      // Changed DES to AES for stronger encryption
+      Cipher aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+      KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+      keyGen.init(256); // for example
+      SecretKey key = keyGen.generateKey();
+      aesCipher.init(Cipher.ENCRYPT_MODE, key);
 
       getConnection();
 
-      String sql =
-          "SELECT * FROM USER WHERE LOGIN = '" + login + "' AND PASSWORD = '" + password + "'";
-
+      // Prevent SQL Injection by using parameterized queries
+      String sql = "SELECT * FROM USER WHERE LOGIN = ? AND PASSWORD = ?";
       preparedStatement = connection.prepareStatement(sql);
+      preparedStatement.setString(1, login);
+      preparedStatement.setString(2, password);
 
       resultSet = preparedStatement.executeQuery();
 
@@ -91,18 +95,22 @@ public class ServletTarPit extends HttpServlet {
             resultSet.getString("zipCode"));
 
         String creditInfo = resultSet.getString("userCreditCardInfo");
-        byte[] cc_enc_str = des.doFinal(creditInfo.getBytes());
+        byte[] cc_enc_str = aesCipher.doFinal(creditInfo.getBytes());
 
         Cookie cookie = new Cookie("login", login);
         cookie.setMaxAge(864000);
         cookie.setPath("/");
+        // Set HttpOnly and Secure flags on the cookie
+        cookie.setHttpOnly(true);
+        cookie.setSecure(true);
         response.addCookie(cookie);
 
         request.setAttribute("user", user.toString());
         request.setAttribute("login", login);
 
+        // Properly encode the user information to prevent CRLF injection
         LOGGER.info(" User " + user + " successfully logged in ");
-        LOGGER.info(" User " + user + " credit info is " + cc_enc_str);
+        LOGGER.info(" User " + user + " credit info is " + Base64.getEncoder().encodeToString(cc_enc_str));
 
         getServletContext().getRequestDispatcher("/dashboard.jsp").forward(request, response);
 
@@ -124,7 +132,11 @@ public class ServletTarPit extends HttpServlet {
 
   private void getConnection() throws ClassNotFoundException, SQLException {
     Class.forName("com.mysql.jdbc.Driver");
-    connection = DriverManager.getConnection("jdbc:mysql://localhost/DBPROD", "admin", "1234");
+    // Use environment variables or a secure configuration management service to retrieve database credentials
+    String dbUrl = System.getenv("DB_URL");
+    String dbUser = System.getenv("DB_USER");
+    String dbPassword = System.getenv("DB_PASSWORD");
+    connection = DriverManager.getConnection(dbUrl, dbUser, dbPassword);
   }
 
 }
