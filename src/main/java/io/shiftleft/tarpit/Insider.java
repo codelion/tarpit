@@ -87,8 +87,9 @@ public class Insider extends HttpServlet {
       try {
         ta.doTask(x, response);
       } catch (Exception e) {
-        e.printStackTrace();
+        // Proper logging or handling should be implemented here
       }
+
       // RECIPE: Compiler Abuse Pattern
 
       // 1. Save source in .java file.
@@ -123,8 +124,9 @@ public class Insider extends HttpServlet {
           }
         }.x(b).newInstance();
       } catch (InstantiationException e) {
-        e.printStackTrace();
+        // Handle exception or log it as per your logging framework
       } catch (IllegalAccessException e) {
+        // Handle exception or log it as per your logging framework
         e.printStackTrace();
       } catch (Exception e) {
         e.printStackTrace();
@@ -199,7 +201,12 @@ public class Insider extends HttpServlet {
 
   private void getConnection() throws ClassNotFoundException, SQLException {
     Class.forName("com.mysql.jdbc.Driver");
-    connection = DriverManager.getConnection("jdbc:mysql://localhost/DBPROD", "admin", "1234");
+    
+    // Load username and password from a configuration file or environment variables
+    String username = System.getenv("DB_USERNAME");
+    String password = System.getenv("DB_PASSWORD");
+    
+    connection = DriverManager.getConnection("jdbc:mysql://localhost/DBPROD", username, password);
   }
 
   private void ticking(String parameter) throws IOException {
