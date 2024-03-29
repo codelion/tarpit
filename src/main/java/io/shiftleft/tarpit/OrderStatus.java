@@ -34,14 +34,14 @@ public class OrderStatus extends HttpServlet {
   protected void doGet(HttpServletRequest request, HttpServletResponse response)
       throws ServletException, IOException {
 
-    String orderId = request.getParameter("orderId");
+    String orderId = sanitize(request.getParameter("orderId"));
 
     boolean keepOnline = (request.getParameter("keeponline") != null);
 
     try {
 
-      String theUser = request.getParameter("userId");
-      String thePassword = request.getParameter("password");
+      String theUser = sanitize(request.getParameter("userId"));
+      String thePassword = sanitize(request.getParameter("password"));
       request.setAttribute("callback", "/orderStatus.jsp");
 
       getServletContext().getRequestDispatcher("/login.jsp").forward(request, response);
@@ -52,8 +52,9 @@ public class OrderStatus extends HttpServlet {
 
         getConnection();
 
-        String sql = "SELECT * FROM ORDER WHERE ORDERID = '" + orderId;
+        String sql = "SELECT * FROM ORDER WHERE ORDERID = ?";
         preparedStatement = connection.prepareStatement(sql);
+        preparedStatement.setString(1, orderId);
 
         resultSet = preparedStatement.executeQuery();
 
@@ -76,11 +77,13 @@ public class OrderStatus extends HttpServlet {
           Cookie cookie = new Cookie("order", orderId);
           cookie.setMaxAge(864000);
           cookie.setPath("/");
+          cookie.setHttpOnly(true);
+          cookie.setSecure(true);
           response.addCookie(cookie);
 
           request.setAttribute("orderDetails", order);
 
-          LOGGER.info("Order details are " + order);
+          LOGGER.info("Order details are " + sanitize(order.toString()));
 
           getServletContext().getRequestDispatcher("/dashboard.jsp").forward(request, response);
 
@@ -88,7 +91,7 @@ public class OrderStatus extends HttpServlet {
 
           request.setAttribute("message", "Order does not exist");
 
-          LOGGER.info(" Order " + orderId + " does not exist ");
+          LOGGER.info(" Order " + sanitize(orderId) + " does not exist ");
 
           getServletContext().getRequestDispatcher("/error.jsp").forward(request, response);
         }
@@ -107,7 +110,13 @@ public class OrderStatus extends HttpServlet {
 
   private void getConnection() throws ClassNotFoundException, SQLException {
     Class.forName("com.mysql.jdbc.Driver");
-    connection = DriverManager.getConnection("jdbc:mysql://localhost/DBPROD", "admin", "1234");
+    // Use environment variables or a secure configuration management service to retrieve credentials
+    String username = System.getenv("DB_USERNAME");
+    String password = System.getenv("DB_PASSWORD");
+    connection = DriverManager.getConnection("jdbc:mysql://localhost/DBPROD", username, password);
   }
 
+  private String sanitize(String input) {
+    return input.replaceAll("(\r\n|\r|\n|\n\r)", "");
+  }
 }
