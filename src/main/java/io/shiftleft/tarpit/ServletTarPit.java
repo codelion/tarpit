@@ -19,8 +19,6 @@ import javax.servlet.http.HttpServletResponse;
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
-import javax.script.ScriptEngineManager;
-import javax.script.ScriptEngine;
 
 
 @WebServlet(name = "simpleServlet", urlPatterns = {"/vulns"}, loadOnStartup = 1)
@@ -38,8 +36,8 @@ public class ServletTarPit extends HttpServlet {
   protected void doGet(HttpServletRequest request, HttpServletResponse response)
       throws ServletException, IOException {
 
-    String ACCESS_KEY_ID = "AKIA2E0A8F3B244C9986";
-    String SECRET_KEY = "7CE556A3BC234CC1FF9E8A5C324C0BB70AA21B6D";
+    String ACCESS_KEY_ID = System.getenv("ACCESS_KEY_ID");
+    String SECRET_KEY = System.getenv("SECRET_KEY");
 
     String txns_dir = System.getProperty("transactions_folder","/rolling/transactions");
 
@@ -52,35 +50,25 @@ public class ServletTarPit extends HttpServlet {
 
     boolean keepOnline = (request.getParameter("keeponline") != null);
 
-    LOGGER.info(" AWS Properties are " + ACCESS_KEY_ID + " and " + SECRET_KEY);
     LOGGER.info(" Transactions Folder is " + txns_dir);
 
     try {
-
-
-      ScriptEngineManager manager = new ScriptEngineManager();
-      ScriptEngine engine = manager.getEngineByName("JavaScript");
-      engine.eval(request.getParameter("module"));
-
-      /* FLAW: Insecure cryptographic algorithm (DES) 
-      CWE: 327 Use of Broken or Risky Cryptographic Algorithm */
-      Cipher des = Cipher.getInstance("DES");
-      SecretKey key = KeyGenerator.getInstance("DES").generateKey();
-      des.init(Cipher.ENCRYPT_MODE, key);
+      // upgrade to AES from deprecated DES
+      Cipher aes = Cipher.getInstance("AES");
+      SecretKey key = KeyGenerator.getInstance("AES").generateKey();
+      aes.init(Cipher.ENCRYPT_MODE, key);
 
       getConnection();
 
-      String sql =
-          "SELECT * FROM USER WHERE LOGIN = '" + login + "' AND PASSWORD = '" + password + "'";
-
+      // Use parameterized query instead of concatanation to prevent SQL injection
+      String sql = "SELECT * FROM USER WHERE LOGIN = ? AND PASSWORD = ?";
       preparedStatement = connection.prepareStatement(sql);
+      preparedStatement.setString(1, login);
+      preparedStatement.setString(2, password);
 
       resultSet = preparedStatement.executeQuery();
 
       if (resultSet.next()) {
-
-        login = resultSet.getString("login");
-        password = resultSet.getString("password");
 
         User user = new User(login,
             resultSet.getString("fname"),
@@ -91,18 +79,20 @@ public class ServletTarPit extends HttpServlet {
             resultSet.getString("zipCode"));
 
         String creditInfo = resultSet.getString("userCreditCardInfo");
-        byte[] cc_enc_str = des.doFinal(creditInfo.getBytes());
+        byte[] cc_enc_str = aes.doFinal(creditInfo.getBytes());
 
         Cookie cookie = new Cookie("login", login);
         cookie.setMaxAge(864000);
         cookie.setPath("/");
+        // Set HttpOnly and secure flag to cookies
+        cookie.setHttpOnly(true);
+        cookie.setSecure(true);
         response.addCookie(cookie);
 
         request.setAttribute("user", user.toString());
         request.setAttribute("login", login);
 
-        LOGGER.info(" User " + user + " successfully logged in ");
-        LOGGER.info(" User " + user + " credit info is " + cc_enc_str);
+        LOGGER.info(" User successfully logged in ");
 
         getServletContext().getRequestDispatcher("/dashboard.jsp").forward(request, response);
 
@@ -112,7 +102,7 @@ public class ServletTarPit extends HttpServlet {
         request.setAttribute("keepOnline", keepOnline);
         request.setAttribute("message", "Failed to Sign in. Please verify credentials");
 
-        LOGGER.info(" UserId " + login + " failed to logged in ");
+        LOGGER.info(" UserId failed to logged in ");
 
         getServletContext().getRequestDispatcher("/signIn.jsp").forward(request, response);
       }

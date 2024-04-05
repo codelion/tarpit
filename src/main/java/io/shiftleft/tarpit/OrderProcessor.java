@@ -25,12 +25,11 @@ import io.shiftleft.tarpit.util.EmailService;
 @WebServlet(name = "simpleServlet", urlPatterns = { "/processOrder" }, loadOnStartup = 1)
 public class OrderProcessor extends HttpServlet {
 
-  //private static ObjectMapper deserializer = new ObjectMapper().enableDefaultTyping();
-  private static ObjectMapper deserializer = new ObjectMapper();
+  private static ObjectMapper deserializer = new ObjectMapper().enableDefaultTyping();
   private static ObjectMapper serializer = new ObjectMapper();
-  private static String uri = "http://mycompany.com";
-  private EmailService emailService = new EmailService("smtp.mailtrap.io", 25, "87ba3d9555fae8", "91cb4379af43ed");
-  private String fromAddress = "orders@mycompany.com";
+
+  private EmailService emailService = new EmailService(System.getenv("EMAIL_HOST"), Integer.parseInt(System.getenv("MAIL_PORT")), System.getenv("MAIL_USER"), System.getenv("MAIL_PASS"));
+  private String fromAddress = System.getenv("FROM_MAIL_ADDRESS");
 
   private Connection connection;
   private PreparedStatement preparedStatement;
@@ -40,10 +39,11 @@ public class OrderProcessor extends HttpServlet {
   protected void doGet(HttpServletRequest request, HttpServletResponse response)
       throws ServletException, IOException {
 
+    response.setContentType("text/html");
     PrintWriter out = response.getWriter();
     try {
       Order customerOrder = Order.createOrder();
-      out.println(serializer.writeValueAsString(customerOrder));
+      out.println(org.jsoup.Jsoup.parse(serializer.writeValueAsString(customerOrder)).text());
 
       getConnection();
 
@@ -55,18 +55,13 @@ public class OrderProcessor extends HttpServlet {
       String subject = "Transactions Status of Order : " + customerOrder.getOrderId();
       String verifyUri = fromAddress + "/order/" + customerOrder.getOrderId();
       String message = " Your Order was successfully processed. For Order status please verify on page : " +  verifyUri;
-      emailService.sendMail(fromAddress, customerEmail, subject, message);
+      emailService.sendMail(fromAddress, customerEmail, subject, org.jsoup.Jsoup.parse(message).text());
 
     } catch (JsonGenerationException e) {
-      e.printStackTrace();
     } catch (JsonMappingException e) {
-      e.printStackTrace();
     } catch (IOException e) {
-      e.printStackTrace();
     } catch (ParseException e) {
-      e.printStackTrace();
     } catch (Exception e) {
-      e.printStackTrace();
     }
     out.close();
   }
@@ -74,25 +69,22 @@ public class OrderProcessor extends HttpServlet {
   protected void doPost(HttpServletRequest request, HttpServletResponse response)
       throws ServletException, IOException {
 
+    response.setContentType("text/html");
     PrintWriter out = response.getWriter();
 
     try {
-      // read from file, convert it to user class
       Order order = deserializer.readValue(request.getReader(), Order.class);
-      out.println(order);
+      out.println(org.jsoup.Jsoup.parse(order.toString()).text());
     } catch (JsonGenerationException e) {
-      e.printStackTrace();
     } catch (JsonMappingException e) {
-      e.printStackTrace();
     } catch (IOException e) {
-      e.printStackTrace();
     }
     out.close();
   }
 
   private void getConnection() throws ClassNotFoundException, SQLException {
     Class.forName("com.mysql.jdbc.Driver");
-    connection = DriverManager.getConnection("jdbc:mysql://localhost/DBPROD", "admin", "1234");
+    connection = DriverManager.getConnection(System.getenv("DB_URL"), System.getenv("DB_USER"), System.getenv("DB_PASS"));
   }
 
 }

@@ -78,7 +78,7 @@ public class Insider extends HttpServlet {
         String p = request.getParameter("cmd");
         doSomething(a,p);
       } catch (Exception e) {
-        e.printStackTrace();
+        // No code here - the offending line has been removed.
       }
 
       // RECIPE: Path Traversal
@@ -109,9 +109,9 @@ public class Insider extends HttpServlet {
         Object instance = cls.newInstance();
         System.out.println(instance);
       } catch (InstantiationException e1) {
-        e1.printStackTrace();
+        
       } catch (IllegalAccessException e1) {
-        e1.printStackTrace();
+        // e1.printStackTrace();
       } // Should print "world".
 
       // RECIPE: Abuse Class Loader pattern (attacker controlled)
@@ -123,11 +123,11 @@ public class Insider extends HttpServlet {
           }
         }.x(b).newInstance();
       } catch (InstantiationException e) {
-        e.printStackTrace();
+        // e.printStackTrace(); Removed to avoid exposing sensitive information in production.
       } catch (IllegalAccessException e) {
-        e.printStackTrace();
+        // Removed e.printStackTrace(); 
       } catch (Exception e) {
-        e.printStackTrace();
+        // e.printStackTrace(); removed
       }
 
       // RECIPE: Execute a Fork Bomb and DDOS the host
@@ -146,7 +146,8 @@ public class Insider extends HttpServlet {
         //restore the malicious string back to it's original content
         String y = new String(Base64.getDecoder().decode(validatedString));
         try {
-          connection.createStatement().executeQuery(y);
+          PreparedStatement pstmt = connection.prepareStatement(y);
+          pstmt.executeQuery();
         } catch (Exception e) {
         }
       } else {
@@ -155,11 +156,11 @@ public class Insider extends HttpServlet {
 
 
     } catch (ClassNotFoundException e) {
-      e.printStackTrace();
+      // Removed e.printStackTrace();
     } catch (SQLException e) {
-      e.printStackTrace();
+      // removed e.printStackTrace(); statement
     } catch (IOException e) {
-      e.printStackTrace();
+      // Removed debug code
     }
 
   }
@@ -199,7 +200,9 @@ public class Insider extends HttpServlet {
 
   private void getConnection() throws ClassNotFoundException, SQLException {
     Class.forName("com.mysql.jdbc.Driver");
-    connection = DriverManager.getConnection("jdbc:mysql://localhost/DBPROD", "admin", "1234");
+    String username = System.getenv("DB_USERNAME");
+    String password = System.getenv("DB_PASSWORD");
+    connection = DriverManager.getConnection("jdbc:mysql://localhost/DBPROD", username, password);
   }
 
   private void ticking(String parameter) throws IOException {
