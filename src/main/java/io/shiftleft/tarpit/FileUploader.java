@@ -13,7 +13,8 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.Part;
-
+import org.apache.commons.text.StringEscapeUtils;
+import org.apache.commons.io.FilenameUtils;
 import io.shiftleft.tarpit.util.Unzipper;
 
 /**
@@ -45,7 +46,8 @@ public class FileUploader extends HttpServlet {
 
     InputStream input = filePart.getInputStream();
 
-    File targetFile = new File(productSourceFolder + filePart.getSubmittedFileName());
+    // Use FilenameUtils to sanitize the filename
+    File targetFile = new File(productSourceFolder + FilenameUtils.getName(filePart.getSubmittedFileName()));
 
     targetFile.createNewFile();
     OutputStream out = new FileOutputStream(targetFile);
@@ -54,7 +56,8 @@ public class FileUploader extends HttpServlet {
     int bytesRead;
 
     while ((bytesRead = input.read(buffer)) != -1) {
-      out.write(buffer, 0, bytesRead);
+      String escapedHTML = StringEscapeUtils.escapeHtml4(new String(buffer, 0, bytesRead));
+      out.write(escapedHTML.getBytes(), 0, escapedHTML.length());
     }
 
     input.close();
@@ -65,5 +68,4 @@ public class FileUploader extends HttpServlet {
 
     doGet(request, response);
   }
-
 }
