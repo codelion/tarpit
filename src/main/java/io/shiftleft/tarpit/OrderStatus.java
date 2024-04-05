@@ -10,6 +10,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Date;
 import java.util.logging.Logger;
+import org.owasp.encoder.Encode;
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
@@ -35,11 +36,9 @@ public class OrderStatus extends HttpServlet {
       throws ServletException, IOException {
 
     String orderId = request.getParameter("orderId");
-
     boolean keepOnline = (request.getParameter("keeponline") != null);
 
     try {
-
       String theUser = request.getParameter("userId");
       String thePassword = request.getParameter("password");
       request.setAttribute("callback", "/orderStatus.jsp");
@@ -49,18 +48,13 @@ public class OrderStatus extends HttpServlet {
       boolean loggedIn = request.isUserInRole("customer");
 
       if (loggedIn) {
-
         getConnection();
-
-        String sql = "SELECT * FROM ORDER WHERE ORDERID = '" + orderId;
-        preparedStatement = connection.prepareStatement(sql);
-
+        preparedStatement = connection.prepareStatement("SELECT * FROM ORDER WHERE ORDERID = ?");
+        preparedStatement.setString(1, orderId);
         resultSet = preparedStatement.executeQuery();
 
         if (resultSet.next()) {
-
           orderId = resultSet.getString("login");
-
           Order order = new Order(orderId,
               resultSet.getString("custId"),
               resultSet.getDate("orderDate"),
@@ -76,25 +70,23 @@ public class OrderStatus extends HttpServlet {
           Cookie cookie = new Cookie("order", orderId);
           cookie.setMaxAge(864000);
           cookie.setPath("/");
+          cookie.setHttpOnly(true);
+          cookie.setSecure(true);
           response.addCookie(cookie);
 
           request.setAttribute("orderDetails", order);
 
-          LOGGER.info("Order details are " + order);
+          LOGGER.info("Order details are " + Encode.forJava(String.valueOf(order)));
 
           getServletContext().getRequestDispatcher("/dashboard.jsp").forward(request, response);
 
         } else {
-
           request.setAttribute("message", "Order does not exist");
-
-          LOGGER.info(" Order " + orderId + " does not exist ");
-
+          LOGGER.info(" Order " + Encode.forJava(orderId) + " does not exist ");
           getServletContext().getRequestDispatcher("/error.jsp").forward(request, response);
         }
 
       } else {
-
         getServletContext().getRequestDispatcher("/login.jsp").forward(request, response);
       }
 
@@ -102,12 +94,13 @@ public class OrderStatus extends HttpServlet {
       throw new ServletException(e);
     }
 
-
   }
 
   private void getConnection() throws ClassNotFoundException, SQLException {
     Class.forName("com.mysql.jdbc.Driver");
-    connection = DriverManager.getConnection("jdbc:mysql://localhost/DBPROD", "admin", "1234");
+    String username = System.getenv("DB_USER");
+    String password = System.getenv("DB_PASS");
+    connection = DriverManager.getConnection("jdbc:mysql://localhost/DBPROD", username, password);
   }
 
-}
+}  
