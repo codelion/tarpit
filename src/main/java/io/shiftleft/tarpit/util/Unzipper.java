@@ -12,7 +12,7 @@ import net.lingala.zip4j.exception.ZipException;
 public class Unzipper {
 
   public static void unzipFile(String zipFileWithAbsolutePath, String destination)
-      throws IOException {
+      throws IOException, ZipException {
     if (!doesFileExists(zipFileWithAbsolutePath)) {
       throw new FileNotFoundException("The given zip file not found: " + zipFileWithAbsolutePath);
     }
@@ -23,16 +23,11 @@ public class Unzipper {
     String finalDestination = getFinalDestination(fileName, destination);
     createDirectoryNamedAsZipFile(finalDestination);
 
-    try {
-      // Initiate ZipFile object with the path/name of the zip file.
-      ZipFile zipFile = new ZipFile(zipFileWithAbsolutePath);
+    // Initiate ZipFile object with the path/name of the zip file.
+    ZipFile zipFile = new ZipFile(zipFileWithAbsolutePath);
 
-      // Extracts all files to the path specified
-      zipFile.extractAll(finalDestination);
-
-    } catch (ZipException e) {
-      e.printStackTrace();
-    }
+    // Extracts all files to the path specified
+    zipFile.extractAll(finalDestination);
 
   }
 
@@ -57,22 +52,15 @@ public class Unzipper {
     return finalDestination;
   }
 
-  private static void createDirectoryNamedAsZipFile(String finalDestination) {
+  private static void createDirectoryNamedAsZipFile(String finalDestination) throws IOException {
     FileSystem fileSystem = FileSystems.getDefault();
 
     if (Files.exists(fileSystem.getPath(finalDestination))) {
-      try {
-        delete(new File(finalDestination));
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
+      delete(new File(finalDestination));
     }
 
-    try {
-      Files.createDirectory(fileSystem.getPath(finalDestination));
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
+    Files.createDirectory(fileSystem.getPath(finalDestination));
+
   }
 
   private static void delete(File file) throws IOException {
@@ -81,13 +69,13 @@ public class Unzipper {
 
       if (childFile.isDirectory()) {
         delete(childFile);
+
       } else {
         if (!childFile.delete()) {
           throw new IOException();
         }
       }
     }
-
     if (!file.delete()) {
       throw new IOException();
     }
