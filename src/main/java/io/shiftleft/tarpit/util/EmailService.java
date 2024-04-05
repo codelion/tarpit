@@ -69,8 +69,4 @@ public class EmailService {
     }
   }
 
-  public static void main(String ... args) {
-    new EmailService("smtp.mailtrap.io", 25, "87ba3d9555fae8", "91cb4379af43ed");
-  }
-
 }
